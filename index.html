@@ -442,6 +442,15 @@
             background: var(--accent);
         }
         
+        .error-message {
+            background: var(--accent);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+        
         @media (max-width: 768px) {
             .game-container {
                 flex-direction: column;
@@ -472,6 +481,8 @@
                 <span id="user-name"></span> | <span id="user-cup"></span> CUP | <span id="user-stars"></span> ★
             </div>
         </header>
+        
+        <div class="error-message" id="error-message"></div>
         
         <div class="game-container">
             <div class="game-board">
@@ -631,14 +642,12 @@
     <script>
         // Configuración de Firebase (reemplaza con tu configuración real)
         const firebaseConfig = {
-            apiKey: "AIzaSyCPf1geb9QeaqqMWxWE1cHz2JksuHwyHJs",
-            authDomain: "granjatrx.firebaseapp.com",
-            databaseURL: "https://granjatrx-default-rtdb.firebaseio.com/",
-            projectId: "granjatrx",
-            storageBucket: "granjatrx.firebasestorage.app",
-            messagingSenderId: "902775659198",
-            appId: "1:902775659198:web:d5c4bb757f8e76c86bdcef",
-            measurementId: "G-EQL3B8E74W"
+            apiKey: "tu-api-key",
+            authDomain: "tu-proyecto.firebaseapp.com",
+            projectId: "tu-proyecto",
+            storageBucket: "tu-proyecto.appspot.com",
+            messagingSenderId: "tu-sender-id",
+            appId: "tu-app-id"
         };
         
         // Inicializar Firebase
@@ -666,6 +675,59 @@
             currentBet: 0,
             gameActive: false
         };
+        
+        // Función para mostrar errores
+        function showError(message) {
+            const errorElement = document.getElementById('error-message');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            
+            // Ocultar el error después de 5 segundos
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Convertir el tablero a formato compatible con Firestore
+        function serializeBoard(board) {
+            const serialized = [];
+            for (let row = 0; row < 8; row++) {
+                const rowData = [];
+                for (let col = 0; col < 8; col++) {
+                    const piece = board[row][col];
+                    if (piece) {
+                        rowData.push({
+                            player: piece.player,
+                            isKing: piece.isKing || false
+                        });
+                    } else {
+                        rowData.push(null);
+                    }
+                }
+                serialized.push(rowData);
+            }
+            return serialized;
+        }
+        
+        // Convertir datos de Firestore a tablero
+        function deserializeBoard(serializedBoard) {
+            const board = [];
+            for (let row = 0; row < 8; row++) {
+                board[row] = [];
+                for (let col = 0; col < 8; col++) {
+                    const pieceData = serializedBoard[row][col];
+                    if (pieceData) {
+                        board[row][col] = {
+                            player: pieceData.player,
+                            isKing: pieceData.isKing || false
+                        };
+                    } else {
+                        board[row][col] = null;
+                    }
+                }
+            }
+            return board;
+        }
         
         // Inicializar el tablero
         function initializeBoard() {
@@ -1373,7 +1435,7 @@
                         alert(`Invitación enviada a ${name} con apuesta de ${betAmount} CUP`);
                     })
                     .catch(error => {
-                        alert('Error al enviar invitación: ' + error.message);
+                        showError('Error al enviar invitación: ' + error.message);
                     });
                 }
             });
@@ -1479,7 +1541,7 @@
                     createOnlineGame(invitation);
                 })
                 .catch(error => {
-                    alert('Error al aceptar la invitación: ' + error.message);
+                    showError('Error al aceptar la invitación: ' + error.message);
                 });
             };
             
@@ -1499,18 +1561,23 @@
         
         // Crear partida en línea
         function createOnlineGame(invitation) {
-            // Crear documento de partida
-            db.collection('games').add({
+            // Inicializar el tablero para la partida en línea
+            initializeBoardForOnline();
+            
+            // Crear documento de partida con el tablero serializado correctamente
+            const gameData = {
                 player1: invitation.from,
                 player1Name: invitation.fromName,
                 player2: invitation.to,
                 player2Name: gameState.currentUser.displayName,
                 betAmount: invitation.betAmount,
                 currentPlayer: 1,
-                board: gameState.board,
+                board: serializeBoard(gameState.board), // Usar la función de serialización
                 status: 'active',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            })
+            };
+            
+            db.collection('games').add(gameData)
             .then(docRef => {
                 gameState.gameId = docRef.id;
                 gameState.gameMode = 'online';
@@ -1536,7 +1603,6 @@
                 
                 // Actualizar interfaz
                 updatePlayersInfo();
-                initializeBoard();
                 updateGameStatus();
                 
                 // Escuchar cambios en la partida
@@ -1549,8 +1615,37 @@
                 alert('¡Partida iniciada! Apuesta: ' + invitation.betAmount + ' CUP');
             })
             .catch(error => {
-                alert('Error al crear partida: ' + error.message);
+                showError('Error al crear partida: ' + error.message);
             });
+        }
+        
+        // Inicializar el tablero para partida en línea
+        function initializeBoardForOnline() {
+            gameState.board = [];
+            
+            // Crear el tablero 8x8
+            for (let row = 0; row < 8; row++) {
+                gameState.board[row] = [];
+                for (let col = 0; col < 8; col++) {
+                    // Colocar fichas iniciales
+                    if ((row + col) % 2 !== 0) {
+                        if (row < 3) {
+                            // Jugador 2 (fichas claras) en las primeras 3 filas
+                            gameState.board[row][col] = { player: 2, isKing: false };
+                        } else if (row > 4) {
+                            // Jugador 1 (fichas oscuras) en las últimas 3 filas
+                            gameState.board[row][col] = { player: 1, isKing: false };
+                        } else {
+                            gameState.board[row][col] = null;
+                        }
+                    } else {
+                        gameState.board[row][col] = null;
+                    }
+                }
+            }
+            
+            // Actualizar la interfaz
+            updateBoardUI();
         }
         
         // Escuchar cambios en la partida
@@ -1562,10 +1657,14 @@
                         
                         // Actualizar estado del juego
                         gameState.currentPlayer = gameData.currentPlayer;
-                        gameState.board = gameData.board || [];
+                        
+                        // Deserializar el tablero correctamente
+                        if (gameData.board) {
+                            gameState.board = deserializeBoard(gameData.board);
+                            updateBoardUI();
+                        }
                         
                         // Actualizar interfaz
-                        updateBoardUI();
                         updateGameStatus();
                         
                         // Verificar si el juego ha terminado
@@ -1573,16 +1672,24 @@
                             endGame(gameData.winner);
                         }
                     }
+                }, error => {
+                    showError('Error al escuchar cambios en la partida: ' + error.message);
                 });
         }
         
         // Guardar estado del juego
         function saveGameState() {
             if (gameState.gameId) {
+                // Serializar el tablero antes de guardarlo
+                const serializedBoard = serializeBoard(gameState.board);
+                
                 db.collection('games').doc(gameState.gameId).update({
-                    board: gameState.board,
+                    board: serializedBoard,
                     currentPlayer: gameState.currentPlayer,
                     lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+                })
+                .catch(error => {
+                    showError('Error al guardar el estado del juego: ' + error.message);
                 });
             }
         }
@@ -1643,6 +1750,9 @@
                     db.collection('games').doc(gameState.gameId).update({
                         status: 'finished',
                         winner: gameState.currentPlayer === 1 ? 2 : 1
+                    })
+                    .catch(error => {
+                        showError('Error al abandonar la partida: ' + error.message);
                     });
                     
                     gameState.gameActive = false;
