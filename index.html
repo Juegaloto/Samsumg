@@ -189,6 +189,7 @@
         
         .player {
             text-align: center;
+            flex: 1;
         }
         
         .player.active {
@@ -206,6 +207,12 @@
             color: gold;
             font-size: 1.5rem;
             margin-top: 5px;
+        }
+        
+        .bet-info {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #f1c40f;
         }
         
         .controls {
@@ -261,7 +268,7 @@
             gap: 10px;
         }
         
-        input {
+        input, select {
             padding: 10px;
             border: none;
             border-radius: 5px;
@@ -387,6 +394,54 @@
             color: #bdc3c7;
         }
         
+        .invitation-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--secondary);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .invitation-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .invitation-buttons button {
+            flex: 1;
+            padding: 8px;
+        }
+        
+        .bet-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .bet-amounts {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .bet-amount {
+            padding: 10px;
+            background: var(--secondary);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .bet-amount:hover, .bet-amount.selected {
+            background: var(--accent);
+        }
+        
         @media (max-width: 768px) {
             .game-container {
                 flex-direction: column;
@@ -394,6 +449,11 @@
             
             .game-board, .game-info {
                 min-width: 100%;
+            }
+            
+            .player-info {
+                flex-direction: column;
+                gap: 10px;
             }
         }
     </style>
@@ -426,11 +486,13 @@
                         <div class="player-name">Jugador 1</div>
                         <div class="player-stars">0 ★</div>
                         <div class="player-cup">CUP: 0</div>
+                        <div class="bet-info" id="player1-bet">Apuesta: 0 CUP</div>
                     </div>
                     <div class="player" id="player2">
                         <div class="player-name">Jugador 2</div>
                         <div class="player-stars">0 ★</div>
                         <div class="player-cup">CUP: 0</div>
+                        <div class="bet-info" id="player2-bet">Apuesta: 0 CUP</div>
                     </div>
                 </div>
                 
@@ -438,6 +500,7 @@
                     <h3>Estado del Juego</h3>
                     <p id="game-status">Esperando jugadores...</p>
                     <p id="move-info">Inicia sesión para jugar</p>
+                    <p id="bet-status" style="color: #f1c40f; font-weight: bold;"></p>
                 </div>
                 
                 <div class="controls">
@@ -445,9 +508,10 @@
                     <button id="online-play" disabled>Jugar en Línea</button>
                     <button id="offline-play" disabled>Jugar fuera de Línea</button>
                     <button id="find-opponent" disabled>Buscar Oponente</button>
+                    <button id="surrender" disabled>Rendirse</button>
                 </div>
                 
-                <div class="online-players" id="online-players-list">
+                <div class="online-players" id="online-players-list" style="display: none;">
                     <h3>Jugadores en Línea</h3>
                     <div id="players-list"></div>
                 </div>
@@ -470,6 +534,15 @@
                     </ul>
                 </div>
             </div>
+        </div>
+    </div>
+    
+    <!-- Notificación de invitación -->
+    <div class="invitation-notification" id="invitation-notification">
+        <div id="invitation-message"></div>
+        <div class="invitation-buttons">
+            <button id="accept-invitation" style="background: var(--success);">Aceptar</button>
+            <button id="decline-invitation" style="background: var(--accent);">Rechazar</button>
         </div>
     </div>
     
@@ -535,6 +608,26 @@
         </div>
     </div>
 
+    <!-- Modal para selección de apuesta -->
+    <div class="modal" id="bet-modal">
+        <div class="modal-content">
+            <h2>Seleccionar Apuesta</h2>
+            <div class="bet-selector">
+                <p>Elige la cantidad que deseas apostar:</p>
+                <div class="bet-amounts">
+                    <div class="bet-amount" data-amount="50">50 CUP</div>
+                    <div class="bet-amount" data-amount="100">100 CUP</div>
+                    <div class="bet-amount" data-amount="200">200 CUP</div>
+                    <div class="bet-amount" data-amount="500">500 CUP</div>
+                </div>
+                <p>O ingresa una cantidad personalizada:</p>
+                <input type="number" id="custom-bet" placeholder="Cantidad personalizada" min="10" max="1000">
+                <button id="confirm-bet">Confirmar Apuesta</button>
+            </div>
+            <button id="close-bet" style="margin-top: 20px; background: var(--accent);">Cancelar</button>
+        </div>
+    </div>
+
     <script>
         // Configuración de Firebase (reemplaza con tu configuración real)
         const firebaseConfig = {
@@ -559,15 +652,19 @@
             currentPlayer: 1,
             selectedPiece: null,
             validMoves: [],
+            validCaptures: [],
             mandatoryCaptures: [],
             gameMode: null, // 'offline' o 'online'
             players: {
-                1: { name: 'Jugador 1', stars: 0, cup: 0, uid: null },
-                2: { name: 'Jugador 2', stars: 0, cup: 0, uid: null }
+                1: { name: 'Jugador 1', stars: 0, cup: 0, uid: null, bet: 0 },
+                2: { name: 'Jugador 2', stars: 0, cup: 0, uid: null, bet: 0 }
             },
             gameId: null,
             currentUser: null,
-            onlinePlayers: []
+            onlinePlayers: [],
+            currentInvitation: null,
+            currentBet: 0,
+            gameActive: false
         };
         
         // Inicializar el tablero
@@ -733,7 +830,7 @@
         
         // Manejar clic en una celda
         function handleCellClick(event) {
-            if (!gameState.currentUser || gameState.gameMode !== 'offline') return;
+            if (!gameState.currentUser || !gameState.gameActive) return;
             
             const cell = event.currentTarget;
             const row = parseInt(cell.dataset.row);
@@ -847,6 +944,11 @@
             gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
             updateGameStatus();
             checkMandatoryCaptures();
+            
+            // Guardar estado del juego si es en línea
+            if (gameState.gameMode === 'online' && gameState.gameId) {
+                saveGameState();
+            }
         }
         
         // Realizar una captura
@@ -891,6 +993,11 @@
                 gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
                 updateGameStatus();
                 checkMandatoryCaptures();
+                
+                // Guardar estado del juego si es en línea
+                if (gameState.gameMode === 'online' && gameState.gameId) {
+                    saveGameState();
+                }
             }
         }
         
@@ -939,25 +1046,57 @@
         function updateGameStatus() {
             const statusElement = document.getElementById('game-status');
             const moveInfoElement = document.getElementById('move-info');
+            const betStatusElement = document.getElementById('bet-status');
             
-            if (gameState.gameMode === 'offline') {
-                statusElement.textContent = `Turno de ${gameState.players[gameState.currentPlayer].name}`;
-                
-                if (gameState.mandatoryCaptures.length > 0) {
-                    moveInfoElement.textContent = 'Debes realizar una captura obligatoria';
-                } else if (gameState.selectedPiece) {
-                    moveInfoElement.textContent = 'Selecciona una celda para mover';
+            if (gameState.gameActive) {
+                if (gameState.gameMode === 'offline') {
+                    statusElement.textContent = `Turno de ${gameState.players[gameState.currentPlayer].name}`;
+                    
+                    if (gameState.mandatoryCaptures.length > 0) {
+                        moveInfoElement.textContent = 'Debes realizar una captura obligatoria';
+                    } else if (gameState.selectedPiece) {
+                        moveInfoElement.textContent = 'Selecciona una celda para mover';
+                    } else {
+                        moveInfoElement.textContent = 'Selecciona una ficha';
+                    }
+                    
+                    // Actualizar indicador de jugador activo
+                    document.getElementById('player1').classList.toggle('active', gameState.currentPlayer === 1);
+                    document.getElementById('player2').classList.toggle('active', gameState.currentPlayer === 2);
                 } else {
-                    moveInfoElement.textContent = 'Selecciona una ficha';
+                    statusElement.textContent = `Turno de ${gameState.players[gameState.currentPlayer].name}`;
+                    moveInfoElement.textContent = gameState.currentPlayer === getCurrentPlayerNumber() ? 
+                        'Es tu turno' : 'Esperando al oponente';
+                    
+                    // Actualizar indicador de jugador activo
+                    document.getElementById('player1').classList.toggle('active', gameState.currentPlayer === 1);
+                    document.getElementById('player2').classList.toggle('active', gameState.currentPlayer === 2);
                 }
                 
-                // Actualizar indicador de jugador activo
-                document.getElementById('player1').classList.toggle('active', gameState.currentPlayer === 1);
-                document.getElementById('player2').classList.toggle('active', gameState.currentPlayer === 2);
+                // Mostrar información de apuesta
+                if (gameState.currentBet > 0) {
+                    betStatusElement.textContent = `Apuesta: ${gameState.currentBet} CUP`;
+                } else {
+                    betStatusElement.textContent = '';
+                }
             } else {
-                statusElement.textContent = 'Modo en línea';
-                moveInfoElement.textContent = 'Busca un oponente para jugar';
+                statusElement.textContent = 'Esperando jugadores...';
+                moveInfoElement.textContent = gameState.currentUser ? 'Selecciona un modo de juego' : 'Inicia sesión para jugar';
+                betStatusElement.textContent = '';
             }
+        }
+        
+        // Obtener el número de jugador actual (1 o 2) en juego en línea
+        function getCurrentPlayerNumber() {
+            if (!gameState.currentUser || !gameState.gameId) return null;
+            
+            if (gameState.players[1].uid === gameState.currentUser.uid) {
+                return 1;
+            } else if (gameState.players[2].uid === gameState.currentUser.uid) {
+                return 2;
+            }
+            
+            return null;
         }
         
         // Sistema de autenticación
@@ -988,6 +1127,9 @@
                     
                     // Escuchar cambios en los jugadores en línea
                     listenToOnlinePlayers();
+                    
+                    // Escuchar invitaciones
+                    listenToInvitations();
                 } else {
                     gameState.currentUser = null;
                     document.getElementById('login-btn').style.display = 'inline-block';
@@ -1002,6 +1144,12 @@
                     document.getElementById('find-opponent').disabled = true;
                     document.getElementById('deposit-btn').disabled = true;
                     document.getElementById('withdraw-btn').disabled = true;
+                    document.getElementById('surrender').disabled = true;
+                    
+                    // Reiniciar estado del juego
+                    gameState.gameActive = false;
+                    gameState.gameMode = null;
+                    updateGameStatus();
                 }
             });
             
@@ -1019,6 +1167,11 @@
             document.getElementById('logout-btn').addEventListener('click', () => {
                 if (gameState.currentUser) {
                     updateOnlineStatus(gameState.currentUser.uid, false);
+                    
+                    // Salir de la partida en curso si existe
+                    if (gameState.gameId) {
+                        leaveGame();
+                    }
                 }
                 auth.signOut();
             });
@@ -1154,16 +1307,6 @@
                         document.getElementById('user-stars').textContent = userData.stars || 0;
                         document.getElementById('user-cup').textContent = userData.cup || 0;
                         document.getElementById('user-balance').textContent = userData.cup || 0;
-                        
-                        // Actualizar estado del juego si es el jugador 1
-                        if (gameState.players[1].uid === uid) {
-                            gameState.players[1].name = userData.name;
-                            gameState.players[1].stars = userData.stars;
-                            gameState.players[1].cup = userData.cup;
-                            document.getElementById('player1').querySelector('.player-name').textContent = userData.name;
-                            document.getElementById('player1').querySelector('.player-stars').textContent = userData.stars + ' ★';
-                            document.getElementById('player1').querySelector('.player-cup').textContent = 'CUP: ' + userData.cup;
-                        }
                     }
                 })
                 .catch(error => {
@@ -1213,22 +1356,302 @@
         
         // Invitar a un jugador a jugar
         function invitePlayer(uid, name) {
-            if (confirm(`¿Invitar a ${name} a jugar?`)) {
-                // Crear una invitación en Firestore
-                db.collection('invitations').add({
-                    from: gameState.currentUser.uid,
-                    fromName: gameState.currentUser.displayName,
-                    to: uid,
-                    toName: name,
-                    status: 'pending',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            // Mostrar modal de selección de apuesta
+            showBetModal().then(betAmount => {
+                if (betAmount > 0) {
+                    // Crear una invitación en Firestore
+                    db.collection('invitations').add({
+                        from: gameState.currentUser.uid,
+                        fromName: gameState.currentUser.displayName,
+                        to: uid,
+                        toName: name,
+                        betAmount: betAmount,
+                        status: 'pending',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    })
+                    .then(() => {
+                        alert(`Invitación enviada a ${name} con apuesta de ${betAmount} CUP`);
+                    })
+                    .catch(error => {
+                        alert('Error al enviar invitación: ' + error.message);
+                    });
+                }
+            });
+        }
+        
+        // Mostrar modal de selección de apuesta
+        function showBetModal() {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('bet-modal');
+                const betAmounts = document.querySelectorAll('.bet-amount');
+                const customBet = document.getElementById('custom-bet');
+                let selectedAmount = 0;
+                
+                // Resetear selección
+                betAmounts.forEach(amount => {
+                    amount.classList.remove('selected');
+                });
+                customBet.value = '';
+                
+                // Manejar selección de cantidad predefinida
+                betAmounts.forEach(amount => {
+                    amount.addEventListener('click', () => {
+                        betAmounts.forEach(a => a.classList.remove('selected'));
+                        amount.classList.add('selected');
+                        selectedAmount = parseInt(amount.dataset.amount);
+                        customBet.value = '';
+                    });
+                });
+                
+                // Manejar cantidad personalizada
+                customBet.addEventListener('input', () => {
+                    betAmounts.forEach(a => a.classList.remove('selected'));
+                    selectedAmount = parseInt(customBet.value) || 0;
+                });
+                
+                // Confirmar apuesta
+                document.getElementById('confirm-bet').addEventListener('click', () => {
+                    if (selectedAmount > 0) {
+                        if (selectedAmount <= parseInt(document.getElementById('user-balance').textContent)) {
+                            modal.style.display = 'none';
+                            resolve(selectedAmount);
+                        } else {
+                            alert('No tienes suficiente saldo para esta apuesta.');
+                        }
+                    } else {
+                        alert('Por favor, selecciona una cantidad para apostar.');
+                    }
+                });
+                
+                // Cancelar
+                document.getElementById('close-bet').addEventListener('click', () => {
+                    modal.style.display = 'none';
+                    resolve(0);
+                });
+                
+                modal.style.display = 'flex';
+            });
+        }
+        
+        // Escuchar invitaciones
+        function listenToInvitations() {
+            db.collection('invitations')
+                .where('to', '==', gameState.currentUser.uid)
+                .where('status', '==', 'pending')
+                .onSnapshot(snapshot => {
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added') {
+                            const invitation = change.doc.data();
+                            invitation.id = change.doc.id;
+                            showInvitationNotification(invitation);
+                        }
+                    });
+                });
+        }
+        
+        // Mostrar notificación de invitación
+        function showInvitationNotification(invitation) {
+            gameState.currentInvitation = invitation;
+            
+            const notification = document.getElementById('invitation-notification');
+            const message = document.getElementById('invitation-message');
+            
+            message.textContent = `${invitation.fromName} te ha invitado a jugar por ${invitation.betAmount} CUP`;
+            notification.style.display = 'block';
+            
+            // Aceptar invitación
+            document.getElementById('accept-invitation').onclick = () => {
+                notification.style.display = 'none';
+                
+                // Verificar saldo suficiente
+                if (invitation.betAmount > parseInt(document.getElementById('user-balance').textContent)) {
+                    alert('No tienes suficiente saldo para aceptar esta invitación.');
+                    declineInvitation(invitation.id);
+                    return;
+                }
+                
+                // Actualizar estado de la invitación
+                db.collection('invitations').doc(invitation.id).update({
+                    status: 'accepted'
                 })
                 .then(() => {
-                    alert(`Invitación enviada a ${name}`);
+                    // Crear partida
+                    createOnlineGame(invitation);
                 })
                 .catch(error => {
-                    alert('Error al enviar invitación: ' + error.message);
+                    alert('Error al aceptar la invitación: ' + error.message);
                 });
+            };
+            
+            // Rechazar invitación
+            document.getElementById('decline-invitation').onclick = () => {
+                notification.style.display = 'none';
+                declineInvitation(invitation.id);
+            };
+        }
+        
+        // Rechazar invitación
+        function declineInvitation(invitationId) {
+            db.collection('invitations').doc(invitationId).update({
+                status: 'declined'
+            });
+        }
+        
+        // Crear partida en línea
+        function createOnlineGame(invitation) {
+            // Crear documento de partida
+            db.collection('games').add({
+                player1: invitation.from,
+                player1Name: invitation.fromName,
+                player2: invitation.to,
+                player2Name: gameState.currentUser.displayName,
+                betAmount: invitation.betAmount,
+                currentPlayer: 1,
+                board: gameState.board,
+                status: 'active',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            })
+            .then(docRef => {
+                gameState.gameId = docRef.id;
+                gameState.gameMode = 'online';
+                gameState.gameActive = true;
+                gameState.currentBet = invitation.betAmount;
+                
+                // Configurar jugadores
+                gameState.players[1] = {
+                    name: invitation.fromName,
+                    uid: invitation.from,
+                    stars: 0,
+                    cup: 0,
+                    bet: invitation.betAmount
+                };
+                
+                gameState.players[2] = {
+                    name: gameState.currentUser.displayName,
+                    uid: gameState.currentUser.uid,
+                    stars: 0,
+                    cup: 0,
+                    bet: invitation.betAmount
+                };
+                
+                // Actualizar interfaz
+                updatePlayersInfo();
+                initializeBoard();
+                updateGameStatus();
+                
+                // Escuchar cambios en la partida
+                listenToGameChanges();
+                
+                // Deshabilitar búsqueda de oponentes
+                document.getElementById('find-opponent').disabled = true;
+                document.getElementById('surrender').disabled = false;
+                
+                alert('¡Partida iniciada! Apuesta: ' + invitation.betAmount + ' CUP');
+            })
+            .catch(error => {
+                alert('Error al crear partida: ' + error.message);
+            });
+        }
+        
+        // Escuchar cambios en la partida
+        function listenToGameChanges() {
+            db.collection('games').doc(gameState.gameId)
+                .onSnapshot(doc => {
+                    if (doc.exists) {
+                        const gameData = doc.data();
+                        
+                        // Actualizar estado del juego
+                        gameState.currentPlayer = gameData.currentPlayer;
+                        gameState.board = gameData.board || [];
+                        
+                        // Actualizar interfaz
+                        updateBoardUI();
+                        updateGameStatus();
+                        
+                        // Verificar si el juego ha terminado
+                        if (gameData.status === 'finished') {
+                            endGame(gameData.winner);
+                        }
+                    }
+                });
+        }
+        
+        // Guardar estado del juego
+        function saveGameState() {
+            if (gameState.gameId) {
+                db.collection('games').doc(gameState.gameId).update({
+                    board: gameState.board,
+                    currentPlayer: gameState.currentPlayer,
+                    lastUpdate: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+        }
+        
+        // Actualizar información de jugadores en la interfaz
+        function updatePlayersInfo() {
+            document.getElementById('player1').querySelector('.player-name').textContent = gameState.players[1].name;
+            document.getElementById('player1').querySelector('.player-stars').textContent = gameState.players[1].stars + ' ★';
+            document.getElementById('player1').querySelector('.player-cup').textContent = 'CUP: ' + gameState.players[1].cup;
+            document.getElementById('player1-bet').textContent = 'Apuesta: ' + gameState.players[1].bet + ' CUP';
+            
+            document.getElementById('player2').querySelector('.player-name').textContent = gameState.players[2].name;
+            document.getElementById('player2').querySelector('.player-stars').textContent = gameState.players[2].stars + ' ★';
+            document.getElementById('player2').querySelector('.player-cup').textContent = 'CUP: ' + gameState.players[2].cup;
+            document.getElementById('player2-bet').textContent = 'Apuesta: ' + gameState.players[2].bet + ' CUP';
+        }
+        
+        // Finalizar juego
+        function endGame(winner) {
+            gameState.gameActive = false;
+            
+            if (winner === getCurrentPlayerNumber()) {
+                alert('¡Felicidades! Has ganado la partida y ' + gameState.currentBet + ' CUP');
+                
+                // Actualizar saldo del usuario
+                const newBalance = parseInt(document.getElementById('user-balance').textContent) + gameState.currentBet;
+                document.getElementById('user-balance').textContent = newBalance;
+                document.getElementById('user-cup').textContent = newBalance;
+                
+                // Actualizar en Firestore
+                db.collection('users').doc(gameState.currentUser.uid).update({
+                    cup: newBalance
+                });
+            } else {
+                alert('Has perdido la partida. ' + gameState.currentBet + ' CUP han sido deducidos de tu cuenta.');
+                
+                // Actualizar saldo del usuario
+                const newBalance = parseInt(document.getElementById('user-balance').textContent) - gameState.currentBet;
+                document.getElementById('user-balance').textContent = newBalance;
+                document.getElementById('user-cup').textContent = newBalance;
+                
+                // Actualizar en Firestore
+                db.collection('users').doc(gameState.currentUser.uid).update({
+                    cup: newBalance
+                });
+            }
+            
+            // Habilitar búsqueda de oponentes
+            document.getElementById('find-opponent').disabled = false;
+            document.getElementById('surrender').disabled = true;
+        }
+        
+        // Abandonar partida
+        function leaveGame() {
+            if (gameState.gameId && gameState.gameActive) {
+                if (confirm('¿Estás seguro de que quieres abandonar la partida? Se considerará una derrota.')) {
+                    // Marcar partida como finalizada
+                    db.collection('games').doc(gameState.gameId).update({
+                        status: 'finished',
+                        winner: gameState.currentPlayer === 1 ? 2 : 1
+                    });
+                    
+                    gameState.gameActive = false;
+                    gameState.gameId = null;
+                    
+                    // Habilitar búsqueda de oponentes
+                    document.getElementById('find-opponent').disabled = false;
+                    document.getElementById('surrender').disabled = true;
+                }
             }
         }
         
@@ -1282,12 +1705,16 @@
         document.getElementById('new-game').addEventListener('click', () => {
             if (confirm('¿Estás seguro de que quieres comenzar un nuevo juego?')) {
                 initializeBoard();
+                gameState.gameActive = true;
+                gameState.gameMode = 'offline';
+                updateGameStatus();
+                document.getElementById('surrender').disabled = false;
             }
         });
         
         document.getElementById('online-play').addEventListener('click', () => {
             gameState.gameMode = 'online';
-            alert('Modo en línea activado. Buscando oponente...');
+            alert('Modo en línea activado. Busca un oponente para jugar.');
             document.getElementById('find-opponent').disabled = false;
         });
         
@@ -1295,13 +1722,16 @@
             gameState.gameMode = 'offline';
             alert('Modo fuera de línea activado.');
             initializeBoard();
+            gameState.gameActive = true;
             
             // Establecer al usuario actual como jugador 1
             if (gameState.currentUser) {
                 gameState.players[1].uid = gameState.currentUser.uid;
                 gameState.players[1].name = gameState.currentUser.displayName;
-                document.getElementById('player1').querySelector('.player-name').textContent = gameState.currentUser.displayName;
+                updatePlayersInfo();
             }
+            
+            document.getElementById('surrender').disabled = false;
         });
         
         document.getElementById('find-opponent').addEventListener('click', () => {
@@ -1310,6 +1740,15 @@
             } else {
                 alert('No hay jugadores en línea en este momento.');
             }
+        });
+        
+        document.getElementById('surrender').addEventListener('click', () => {
+            leaveGame();
+        });
+        
+        // Cerrar modal de apuesta
+        document.getElementById('close-bet').addEventListener('click', () => {
+            document.getElementById('bet-modal').style.display = 'none';
         });
         
         // Inicializar la aplicación
@@ -1321,6 +1760,7 @@
         document.getElementById('online-play').disabled = true;
         document.getElementById('offline-play').disabled = true;
         document.getElementById('find-opponent').disabled = true;
+        document.getElementById('surrender').disabled = true;
     </script>
 </body>
 </html>
