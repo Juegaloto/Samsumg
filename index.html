@@ -3,38 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Damas Online con Apuestas</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <title>Damas Online con Firebase</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <style>
-        :root {
-            --primary-color: #4a6fa5;
-            --secondary-color: #166088;
-            --accent-color: #4cb5ae;
-            --dark-color: #2d3047;
-            --light-color: #f8f9fa;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --danger-color: #dc3545;
-            --board-light: #f0d9b5;
-            --board-dark: #b58863;
-            --piece-light: #ffffff;
-            --piece-dark: #000000;
-            --king-light: #ffeb3b;
-            --king-dark: #8b4513;
-        }
-
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
-            background: linear-gradient(135deg, var(--dark-color), var(--secondary-color));
-            color: var(--light-color);
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
         }
@@ -42,304 +24,193 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 300px;
-            gap: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
         }
 
         header {
-            grid-column: 1 / -1;
-            text-align: center;
+            background: #2c3e50;
+            color: white;
             padding: 20px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            background: linear-gradient(to right, var(--accent-color), var(--primary-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            text-align: center;
         }
 
         .game-area {
-            display: grid;
-            grid-template-columns: 1fr;
+            display: flex;
+            flex-wrap: wrap;
             gap: 20px;
+            padding: 20px;
         }
 
-        .game-board {
-            background: var(--board-light);
+        .auth-section, .game-section, .players-section {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .section {
+            background: #f8f9fa;
             border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .board {
+            width: 400px;
+            height: 400px;
+            margin: 0 auto;
+            border: 3px solid #2c3e50;
             display: grid;
             grid-template-columns: repeat(8, 1fr);
             grid-template-rows: repeat(8, 1fr);
-            aspect-ratio: 1/1;
-            max-width: 600px;
-            margin: 0 auto;
         }
 
         .cell {
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
         .cell.light {
-            background-color: var(--board-light);
+            background-color: #f0d9b5;
         }
 
         .cell.dark {
-            background-color: var(--board-dark);
+            background-color: #b58863;
         }
 
-        .cell.valid-move::after {
-            content: '';
-            position: absolute;
-            width: 30%;
-            height: 30%;
-            border-radius: 50%;
-            background-color: rgba(76, 181, 174, 0.5);
-        }
-
-        .cell.selected {
-            box-shadow: inset 0 0 0 3px var(--accent-color);
+        .cell.possible-move {
+            background-color: rgba(52, 152, 219, 0.5) !important;
         }
 
         .piece {
             width: 80%;
             height: 80%;
             border-radius: 50%;
-            cursor: pointer;
-            position: relative;
-            transition: transform 0.3s;
-            box-shadow: 0 3px 5px rgba(0, 0, 0, 0.3);
+            border: 2px solid #2c3e50;
+            transition: all 0.3s ease;
         }
 
-        .piece.player1 {
-            background: linear-gradient(145deg, var(--piece-light), #d9d9d9);
+        .piece.red {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
         }
 
-        .piece.player2 {
-            background: linear-gradient(145deg, var(--piece-dark), #333333);
+        .piece.black {
+            background: linear-gradient(145deg, #2c3e50, #34495e);
         }
 
         .piece.king::after {
-            content: '♔';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 1.5rem;
-            color: var(--king-light);
-        }
-
-        .piece.player2.king::after {
-            color: var(--king-dark);
+            content: "♔";
+            color: gold;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
         }
 
         .piece.selected {
+            box-shadow: 0 0 0 3px gold;
             transform: scale(1.1);
-            box-shadow: 0 0 10px var(--accent-color);
         }
 
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .panel {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .panel h2 {
-            margin-bottom: 15px;
-            color: var(--accent-color);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-            padding-bottom: 10px;
-        }
-
-        .user-info {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .balance {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--accent-color);
-        }
-
-        .betting-area {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .bet-input {
-            display: flex;
-            gap: 10px;
-        }
-
-        .bet-input input {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-            background: rgba(255, 255, 255, 0.1);
+        button {
+            background: #3498db;
             color: white;
-        }
-
-        .bet-input button {
-            padding: 10px 15px;
             border: none;
-            border-radius: 5px;
-            background: var(--accent-color);
-            color: white;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        .bet-input button:hover {
-            background: #3a9c96;
-        }
-
-        .bet-options {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
-
-        .bet-option {
-            padding: 10px;
-            text-align: center;
-            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
             border-radius: 5px;
             cursor: pointer;
-            transition: background 0.3s;
+            margin: 5px;
+            transition: background 0.3s ease;
         }
 
-        .bet-option:hover {
-            background: rgba(255, 255, 255, 0.2);
+        button:hover {
+            background: #2980b9;
         }
 
-        .bet-option.selected {
-            background: var(--accent-color);
+        button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .player-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .player-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
         }
 
         .game-info {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .status {
-            padding: 10px;
-            border-radius: 5px;
             text-align: center;
-            font-weight: bold;
-        }
-
-        .status.waiting {
-            background: var(--warning-color);
-            color: var(--dark-color);
-        }
-
-        .status.playing {
-            background: var(--success-color);
-        }
-
-        .status.finished {
-            background: var(--primary-color);
-        }
-
-        .players {
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .player {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .player.active {
-            color: var(--accent-color);
-            font-weight: bold;
-        }
-
-        .player-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-        }
-
-        .player1 .player-icon {
-            background: var(--piece-light);
-        }
-
-        .player2 .player-icon {
-            background: var(--piece-dark);
-        }
-
-        .auth-section {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .auth-form {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .auth-form input {
             padding: 10px;
-            border: none;
+            background: #ecf0f1;
             border-radius: 5px;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
+            margin: 10px 0;
         }
 
-        .auth-form button {
+        .current-player {
+            font-weight: bold;
+            color: #e74c3c;
+        }
+
+        .chat-box {
+            height: 150px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
             padding: 10px;
-            border: none;
-            border-radius: 5px;
-            background: var(--primary-color);
-            color: white;
-            cursor: pointer;
-            transition: background 0.3s;
+            overflow-y: auto;
+            margin: 10px 0;
+            background: white;
         }
 
-        .auth-form button:hover {
-            background: var(--secondary-color);
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
         }
 
-        .hidden {
-            display: none;
+        .message.own {
+            background: #d4edda;
+            text-align: right;
+        }
+
+        .message.other {
+            background: #f8d7da;
         }
 
         @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
+            .game-area {
+                flex-direction: column;
             }
             
-            .game-board {
-                max-width: 100%;
+            .board {
+                width: 300px;
+                height: 300px;
             }
         }
     </style>
@@ -347,132 +218,291 @@
 <body>
     <div class="container">
         <header>
-            <h1>Damas Online con Apuestas</h1>
-            <p>Juega y apuesta desde 50 CUP hasta 1000 CUP</p>
+            <h1>♟️ Damas Online con Firebase</h1>
         </header>
 
-        <main class="game-area">
-            <div class="game-board" id="gameBoard">
-                <!-- El tablero se generará con JavaScript -->
-            </div>
-        </main>
-
-        <aside class="sidebar">
-            <div class="panel auth-section" id="authSection">
-                <h2>Iniciar Sesión / Registrarse</h2>
-                <div class="auth-form">
-                    <input type="email" id="emailInput" placeholder="Correo electrónico">
-                    <input type="password" id="passwordInput" placeholder="Contraseña">
-                    <button id="loginBtn">Iniciar Sesión</button>
-                    <button id="registerBtn">Registrarse</button>
-                </div>
-            </div>
-
-            <div class="panel user-info hidden" id="userInfo">
-                <h2>Información del Usuario</h2>
-                <div id="userEmail"></div>
-                <div class="balance" id="userBalance">0 CUP</div>
-                <button id="logoutBtn">Cerrar Sesión</button>
-            </div>
-
-            <div class="panel betting-area hidden" id="bettingArea">
-                <h2>Realizar Apuesta</h2>
-                <div class="bet-input">
-                    <input type="number" id="betAmount" min="50" max="1000" placeholder="Cantidad (50-1000 CUP)">
-                    <button id="placeBetBtn">Apostar</button>
-                </div>
-                <div class="bet-options">
-                    <div class="bet-option" data-amount="50">50 CUP</div>
-                    <div class="bet-option" data-amount="100">100 CUP</div>
-                    <div class="bet-option" data-amount="200">200 CUP</div>
-                    <div class="bet-option" data-amount="300">300 CUP</div>
-                    <div class="bet-option" data-amount="500">500 CUP</div>
-                    <div class="bet-option" data-amount="1000">1000 CUP</div>
-                </div>
-            </div>
-
-            <div class="panel game-info hidden" id="gameInfo">
-                <h2>Información del Juego</h2>
-                <div class="status" id="gameStatus">Esperando jugadores...</div>
-                <div class="players">
-                    <div class="player player1" id="player1Info">
-                        <div class="player-icon"></div>
-                        <div>Jugador 1</div>
-                        <div id="player1Bet">Apuesta: 0 CUP</div>
+        <div class="game-area">
+            <!-- Sección de Autenticación -->
+            <div class="auth-section">
+                <div class="section">
+                    <h2>🔐 Autenticación</h2>
+                    <div id="auth-buttons">
+                        <input type="email" id="email" placeholder="Email" />
+                        <input type="password" id="password" placeholder="Contraseña" />
+                        <button onclick="login()">Iniciar Sesión</button>
+                        <button onclick="register()">Registrarse</button>
+                        <button onclick="logout()">Cerrar Sesión</button>
                     </div>
-                    <div class="player player2" id="player2Info">
-                        <div class="player-icon"></div>
-                        <div>Jugador 2</div>
-                        <div id="player2Bet">Apuesta: 0 CUP</div>
+                    <div id="user-info" style="display: none;">
+                        <p>Conectado como: <span id="user-email"></span></p>
                     </div>
                 </div>
-                <div id="gameRules">
-                    <p><strong>Reglas:</strong> Las fichas deben comer obligatoriamente cuando es posible. Al llegar al final del tablero, coronan como reina y pueden moverse en cualquier dirección y distancia.</p>
+
+                <!-- Sección de Jugadores -->
+                <div class="section">
+                    <h2>👥 Jugadores Conectados</h2>
+                    <div id="players-list" class="player-list">
+                        <!-- Lista de jugadores se cargará aquí -->
+                    </div>
+                    <button onclick="createGame()" id="create-game-btn" disabled>Crear Nueva Partida</button>
                 </div>
             </div>
-        </aside>
+
+            <!-- Sección del Juego -->
+            <div class="game-section">
+                <div class="section">
+                    <h2>🎮 Tablero de Damas</h2>
+                    <div class="game-info">
+                        <p>Estado: <span id="game-status">Esperando jugadores...</span></p>
+                        <p>Turno actual: <span id="current-turn" class="current-player">-</span></p>
+                        <p>Tu color: <span id="player-color">-</span></p>
+                    </div>
+                    <div class="board" id="game-board">
+                        <!-- Tablero se generará dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección de Chat -->
+            <div class="players-section">
+                <div class="section">
+                    <h2>💬 Chat de la Partida</h2>
+                    <div id="chat-messages" class="chat-box">
+                        <!-- Mensajes del chat -->
+                    </div>
+                    <input type="text" id="chat-input" placeholder="Escribe un mensaje..." onkeypress="handleChatKeypress(event)" />
+                    <button onclick="sendMessage()">Enviar</button>
+                </div>
+
+                <div class="section">
+                    <h2>📊 Información de la Partida</h2>
+                    <div id="game-stats">
+                        <p>Jugador Rojo: <span id="red-player">-</span></p>
+                        <p>Jugador Negro: <span id="black-player">-</span></p>
+                        <p>Piezas rojas: <span id="red-pieces">12</span></p>
+                        <p>Piezas negras: <span id="black-pieces">12</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Configuración de Firebase
+        // Configuración de Firebase - ¡REEMPLAZA CON TUS PROPIAS CREDENCIALES!
         const firebaseConfig = {
-            apiKey: "TU_API_KEY",
-            authDomain: "TU_PROYECTO.firebaseapp.com",
-            projectId: "TU_PROYECTO",
-            storageBucket: "TU_PROYECTO.appspot.com",
-            messagingSenderId: "TU_SENDER_ID",
-            appId: "TU_APP_ID"
+            apiKey: "AIzaSyCPf1geb9QeaqqMWxWE1cHz2JksuHwyHJs",
+            authDomain: "granjatrx.firebaseapp.com",
+            databaseURL: "https://granjatrx-default-rtdb.firebaseio.com/",
+            projectId: "granjatrx",
+            storageBucket: "granjatrx.firebasestorage.app",
+            messagingSenderId: "902775659198",
+            appId: "1:902775659198:web:d5c4bb757f8e76c86bdcef",
+            measurementId: "G-EQL3B8E74W"
         };
 
         // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
-        const db = firebase.firestore();
+        const database = firebase.database();
 
-        // Variables del juego
+        // Variables globales del juego
         let currentUser = null;
-        let userBalance = 0;
-        let gameState = {
-            board: [],
-            currentPlayer: 1,
-            selectedPiece: null,
-            validMoves: [],
-            gameStatus: 'waiting', // waiting, playing, finished
-            players: {
-                1: { uid: null, bet: 0 },
-                2: { uid: null, bet: 0 }
-            },
-            winner: null
-        };
+        let currentGame = null;
+        let playerColor = null;
+        let selectedPiece = null;
+        let possibleMoves = [];
 
-        // Elementos del DOM
-        const authSection = document.getElementById('authSection');
-        const userInfo = document.getElementById('userInfo');
-        const userEmail = document.getElementById('userEmail');
-        const userBalanceElem = document.getElementById('userBalance');
-        const bettingArea = document.getElementById('bettingArea');
-        const gameInfo = document.getElementById('gameInfo');
-        const gameBoard = document.getElementById('gameBoard');
-        const betAmountInput = document.getElementById('betAmount');
-        const placeBetBtn = document.getElementById('placeBetBtn');
-        const betOptions = document.querySelectorAll('.bet-option');
-        const gameStatus = document.getElementById('gameStatus');
-        const player1Info = document.getElementById('player1Info');
-        const player2Info = document.getElementById('player2Info');
-        const player1Bet = document.getElementById('player1Bet');
-        const player2Bet = document.getElementById('player2Bet');
-        const loginBtn = document.getElementById('loginBtn');
-        const registerBtn = document.getElementById('registerBtn');
-        const logoutBtn = document.getElementById('logoutBtn');
+        // Inicializar la aplicación
+        function init() {
+            createBoard();
+            setupAuthListener();
+            setupGameListeners();
+        }
 
-        // Inicializar el tablero
-        function initializeBoard() {
-            gameBoard.innerHTML = '';
-            gameState.board = [];
+        // Configurar listener de autenticación
+        function setupAuthListener() {
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('user-email').textContent = user.email;
+                    document.getElementById('auth-buttons').style.display = 'none';
+                    document.getElementById('user-info').style.display = 'block';
+                    document.getElementById('create-game-btn').disabled = false;
+                    
+                    // Registrar usuario en la lista de jugadores
+                    registerPlayer(user);
+                    loadOnlinePlayers();
+                } else {
+                    currentUser = null;
+                    document.getElementById('auth-buttons').style.display = 'block';
+                    document.getElementById('user-info').style.display = 'none';
+                    document.getElementById('create-game-btn').disabled = true;
+                }
+            });
+        }
+
+        // Funciones de autenticación
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
             
-            // Crear el tablero vacío
+            auth.signInWithEmailAndPassword(email, password)
+                .catch((error) => {
+                    alert('Error al iniciar sesión: ' + error.message);
+                });
+        }
+
+        function register() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            auth.createUserWithEmailAndPassword(email, password)
+                .catch((error) => {
+                    alert('Error al registrarse: ' + error.message);
+                });
+        }
+
+        function logout() {
+            if (currentGame) {
+                leaveGame();
+            }
+            auth.signOut();
+        }
+
+        // Gestión de jugadores online
+        function registerPlayer(user) {
+            const playerRef = database.ref('players/' + user.uid);
+            playerRef.set({
+                email: user.email,
+                online: true,
+                lastOnline: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            playerRef.onDisconnect().update({
+                online: false,
+                lastOnline: firebase.database.ServerValue.TIMESTAMP
+            });
+        }
+
+        function loadOnlinePlayers() {
+            const playersRef = database.ref('players');
+            playersRef.on('value', (snapshot) => {
+                const players = snapshot.val();
+                const playersList = document.getElementById('players-list');
+                playersList.innerHTML = '';
+
+                if (players) {
+                    Object.keys(players).forEach((uid) => {
+                        if (players[uid].online && uid !== currentUser.uid) {
+                            const playerItem = document.createElement('div');
+                            playerItem.className = 'player-item';
+                            playerItem.innerHTML = `
+                                ${players[uid].email}
+                                <button onclick="joinGame('${uid}')">Unirse</button>
+                            `;
+                            playersList.appendChild(playerItem);
+                        }
+                    });
+                }
+            });
+        }
+
+        // Gestión del juego
+        function createGame() {
+            const gameId = generateGameId();
+            currentGame = gameId;
+            playerColor = 'red'; // El creador es siempre rojo
+
+            const gameRef = database.ref('games/' + gameId);
+            gameRef.set({
+                playerRed: currentUser.uid,
+                playerBlack: null,
+                currentTurn: 'red',
+                board: getInitialBoard(),
+                status: 'waiting',
+                created: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            setupGameListener(gameId);
+        }
+
+        function joinGame(opponentUid) {
+            // Buscar si el oponente tiene un juego esperando
+            const gamesRef = database.ref('games');
+            gamesRef.orderByChild('playerRed').equalTo(opponentUid).once('value')
+                .then((snapshot) => {
+                    let gameFound = null;
+                    
+                    snapshot.forEach((game) => {
+                        if (game.val().status === 'waiting') {
+                            gameFound = game;
+                            return true;
+                        }
+                    });
+
+                    if (gameFound) {
+                        currentGame = gameFound.key;
+                        playerColor = 'black';
+                        
+                        const gameRef = database.ref('games/' + gameFound.key);
+                        gameRef.update({
+                            playerBlack: currentUser.uid,
+                            status: 'playing'
+                        });
+
+                        setupGameListener(gameFound.key);
+                    } else {
+                        alert('No se encontró partida disponible para unirse');
+                    }
+                });
+        }
+
+        function leaveGame() {
+            if (currentGame) {
+                const gameRef = database.ref('games/' + currentGame);
+                gameRef.update({
+                    status: 'finished'
+                });
+                currentGame = null;
+                playerColor = null;
+                resetBoard();
+            }
+        }
+
+        function setupGameListener(gameId) {
+            const gameRef = database.ref('games/' + gameId);
+            gameRef.on('value', (snapshot) => {
+                const game = snapshot.val();
+                if (!game) return;
+
+                updateGameUI(game);
+                
+                if (game.status === 'finished') {
+                    gameRef.off();
+                    currentGame = null;
+                    playerColor = null;
+                }
+            });
+        }
+
+        function setupGameListeners() {
+            // Escuchar invitaciones a partidas
+            const gamesRef = database.ref('games');
+            gamesRef.orderByChild('playerBlack').equalTo(null).on('child_added', (snapshot) => {
+                const game = snapshot.val();
+                if (game.playerRed !== currentUser?.uid) {
+                    // Aquí podrías mostrar una notificación de invitación
+                    console.log('Nueva partida disponible:', game);
+                }
+            });
+        }
+
+        // Lógica del tablero y juego
+        function createBoard() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+            
             for (let row = 0; row < 8; row++) {
-                gameState.board[row] = [];
                 for (let col = 0; col < 8; col++) {
                     const cell = document.createElement('div');
                     cell.className = `cell ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
@@ -480,550 +510,260 @@
                     cell.dataset.col = col;
                     
                     cell.addEventListener('click', () => handleCellClick(row, col));
-                    gameBoard.appendChild(cell);
-                    
-                    // Inicializar la posición en el estado del juego
-                    gameState.board[row][col] = null;
+                    board.appendChild(cell);
                 }
             }
-            
-            // Colocar las fichas iniciales
-            setupInitialPieces();
         }
 
-        // Configurar las fichas iniciales
-        function setupInitialPieces() {
-            // Fichas del jugador 1 (parte superior)
+        function getInitialBoard() {
+            const board = Array(8).fill().map(() => Array(8).fill(null));
+            
+            // Colocar piezas rojas (parte superior)
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
-                        addPiece(row, col, 1);
+                        board[row][col] = { type: 'pawn', color: 'red' };
                     }
                 }
             }
             
-            // Fichas del jugador 2 (parte inferior)
+            // Colocar piezas negras (parte inferior)
             for (let row = 5; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
                     if ((row + col) % 2 === 1) {
-                        addPiece(row, col, 2);
+                        board[row][col] = { type: 'pawn', color: 'black' };
+                    }
+                }
+            }
+            
+            return board;
+        }
+
+        function updateGameUI(game) {
+            // Actualizar información del juego
+            document.getElementById('game-status').textContent = 
+                game.status === 'waiting' ? 'Esperando oponente...' : 
+                game.status === 'playing' ? 'Partida en curso' : 'Partida finalizada';
+            
+            document.getElementById('current-turn').textContent = game.currentTurn;
+            document.getElementById('player-color').textContent = playerColor;
+            
+            // Actualizar información de jugadores
+            if (game.playerRed) {
+                database.ref('players/' + game.playerRed).once('value')
+                    .then(snap => {
+                        document.getElementById('red-player').textContent = snap.val().email;
+                    });
+            }
+            if (game.playerBlack) {
+                database.ref('players/' + game.playerBlack).once('value')
+                    .then(snap => {
+                        document.getElementById('black-player').textContent = snap.val().email;
+                    });
+            }
+
+            // Actualizar tablero
+            renderBoard(game.board);
+            
+            // Contar piezas
+            countPieces(game.board);
+        }
+
+        function renderBoard(board) {
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+                    cell.innerHTML = '';
+                    
+                    if (board[row][col]) {
+                        const piece = document.createElement('div');
+                        piece.className = `piece ${board[row][col].color} ${board[row][col].type === 'king' ? 'king' : ''}`;
+                        cell.appendChild(piece);
                     }
                 }
             }
         }
 
-        // Añadir una ficha al tablero
-        function addPiece(row, col, player) {
-            const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
-            const piece = document.createElement('div');
-            piece.className = `piece player${player}`;
-            piece.dataset.player = player;
-            cell.appendChild(piece);
-            
-            gameState.board[row][col] = {
-                player: player,
-                isKing: false
-            };
-        }
-
-        // Manejar clic en una celda
         function handleCellClick(row, col) {
-            if (gameState.gameStatus !== 'playing') return;
-            if (gameState.players[gameState.currentPlayer].uid !== currentUser.uid) return;
+            if (!currentGame || playerColor === null) return;
             
-            const piece = gameState.board[row][col];
-            
-            // Si hay una ficha seleccionada, intentar moverla
-            if (gameState.selectedPiece) {
-                const move = gameState.validMoves.find(m => 
-                    m.toRow === row && m.toCol === col
-                );
-                
-                if (move) {
-                    movePiece(gameState.selectedPiece.row, gameState.selectedPiece.col, row, col);
-                    if (move.captures) {
-                        // Eliminar la ficha capturada
-                        const captureRow = (gameState.selectedPiece.row + row) / 2;
-                        const captureCol = (gameState.selectedPiece.col + col) / 2;
-                        removePiece(captureRow, captureCol);
-                        
-                        // Verificar si hay más capturas posibles
-                        const moreCaptures = getValidMoves(row, col).filter(m => m.captures);
-                        if (moreCaptures.length > 0) {
-                            // Permitir captura múltiple
-                            gameState.selectedPiece = { row, col };
-                            gameState.validMoves = moreCaptures;
-                            highlightValidMoves();
-                            return;
-                        }
+            const gameRef = database.ref('games/' + currentGame);
+            gameRef.once('value').then((snapshot) => {
+                const game = snapshot.val();
+                if (game.currentTurn !== playerColor || game.status !== 'playing') return;
+
+                const board = game.board;
+                const piece = board[row][col];
+
+                if (piece && piece.color === playerColor) {
+                    // Seleccionar pieza
+                    selectedPiece = { row, col };
+                    possibleMoves = calculatePossibleMoves(board, row, col);
+                    highlightPossibleMoves(possibleMoves);
+                } else if (selectedPiece) {
+                    // Mover pieza
+                    const move = possibleMoves.find(m => m.toRow === row && m.toCol === col);
+                    if (move) {
+                        makeMove(gameRef, board, selectedPiece.row, selectedPiece.col, row, col, move.captures);
                     }
-                    
-                    // Cambiar de jugador
-                    gameState.currentPlayer = gameState.currentPlayer === 1 ? 2 : 1;
-                    gameState.selectedPiece = null;
-                    gameState.validMoves = [];
+                    selectedPiece = null;
                     clearHighlights();
-                    
-                    // Verificar si el juego ha terminado
-                    checkGameEnd();
-                    
-                    // Actualizar la interfaz
-                    updateGameUI();
-                } else {
-                    // Si se hace clic en otra ficha del mismo jugador, seleccionarla
-                    if (piece && piece.player === gameState.currentPlayer) {
-                        selectPiece(row, col);
-                    } else {
-                        // Deseleccionar la ficha actual
-                        gameState.selectedPiece = null;
-                        gameState.validMoves = [];
-                        clearHighlights();
-                    }
                 }
-            } else {
-                // Seleccionar una ficha si pertenece al jugador actual
-                if (piece && piece.player === gameState.currentPlayer) {
-                    selectPiece(row, col);
-                }
-            }
+            });
         }
 
-        // Seleccionar una ficha
-        function selectPiece(row, col) {
-            gameState.selectedPiece = { row, col };
-            gameState.validMoves = getValidMoves(row, col);
-            highlightValidMoves();
-        }
-
-        // Obtener movimientos válidos para una ficha
-        function getValidMoves(row, col) {
-            const piece = gameState.board[row][col];
-            if (!piece) return [];
-            
+        function calculatePossibleMoves(board, row, col) {
+            const piece = board[row][col];
             const moves = [];
-            const directions = piece.isKing ? 
+            const directions = piece.type === 'king' ? 
                 [[-1, -1], [-1, 1], [1, -1], [1, 1]] : 
-                (piece.player === 1 ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]]);
-            
-            // Verificar capturas obligatorias primero
-            let hasCaptures = false;
-            
+                piece.color === 'red' ? [[1, -1], [1, 1]] : [[-1, -1], [-1, 1]];
+
+            // Movimientos simples y capturas
             for (const [dr, dc] of directions) {
-                let captureRow = row + dr;
-                let captureCol = col + dc;
-                let landingRow = row + 2 * dr;
-                let landingCol = col + 2 * dc;
+                const newRow = row + dr;
+                const newCol = col + dc;
                 
-                // Para reinas, verificar múltiples saltos
-                if (piece.isKing) {
-                    let currentRow = row + dr;
-                    let currentCol = col + dc;
-                    
-                    while (currentRow >= 0 && currentRow < 8 && currentCol >= 0 && currentCol < 8) {
-                        if (gameState.board[currentRow][currentCol]) {
-                            if (gameState.board[currentRow][currentCol].player !== piece.player) {
-                                // Encontrar la celda de aterrizaje después de la captura
-                                let nextRow = currentRow + dr;
-                                let nextCol = currentCol + dc;
-                                
-                                while (nextRow >= 0 && nextRow < 8 && nextCol >= 0 && nextCol < 8) {
-                                    if (!gameState.board[nextRow][nextCol]) {
-                                        moves.push({
-                                            toRow: nextRow,
-                                            toCol: nextCol,
-                                            captures: { row: currentRow, col: currentCol }
-                                        });
-                                        hasCaptures = true;
-                                    } else {
-                                        break;
-                                    }
-                                    nextRow += dr;
-                                    nextCol += dc;
-                                }
-                            }
-                            break;
-                        }
-                        currentRow += dr;
-                        currentCol += dc;
-                    }
-                } else {
-                    // Para fichas normales
-                    if (landingRow >= 0 && landingRow < 8 && landingCol >= 0 && landingCol < 8) {
-                        const capturePiece = gameState.board[captureRow][captureCol];
-                        const landingPiece = gameState.board[landingRow][landingCol];
-                        
-                        if (capturePiece && capturePiece.player !== piece.player && !landingPiece) {
-                            moves.push({
-                                toRow: landingRow,
-                                toCol: landingCol,
-                                captures: { row: captureRow, col: captureCol }
-                            });
-                            hasCaptures = true;
-                        }
-                    }
-                }
-            }
-            
-            // Si hay capturas, solo permitir movimientos de captura
-            if (hasCaptures) {
-                return moves;
-            }
-            
-            // Si no hay capturas, permitir movimientos normales
-            for (const [dr, dc] of directions) {
-                if (piece.isKing) {
-                    // Para reinas, permitir movimientos a lo largo de la diagonal
-                    let currentRow = row + dr;
-                    let currentCol = col + dc;
-                    
-                    while (currentRow >= 0 && currentRow < 8 && currentCol >= 0 && currentCol < 8) {
-                        if (!gameState.board[currentRow][currentCol]) {
-                            moves.push({
-                                toRow: currentRow,
-                                toCol: currentCol,
-                                captures: null
-                            });
-                        } else {
-                            break;
-                        }
-                        currentRow += dr;
-                        currentCol += dc;
-                    }
-                } else {
-                    // Para fichas normales, solo un movimiento
-                    const newRow = row + dr;
-                    const newCol = col + dc;
-                    
-                    if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-                        if (!gameState.board[newRow][newCol]) {
-                            moves.push({
-                                toRow: newRow,
-                                toCol: newCol,
-                                captures: null
+                if (isValidPosition(newRow, newCol)) {
+                    if (!board[newRow][newCol]) {
+                        moves.push({ toRow: newRow, toCol: newCol, captures: [] });
+                    } else if (board[newRow][newCol].color !== piece.color) {
+                        const jumpRow = newRow + dr;
+                        const jumpCol = newCol + dc;
+                        if (isValidPosition(jumpRow, jumpCol) && !board[jumpRow][jumpCol]) {
+                            moves.push({ 
+                                toRow: jumpRow, 
+                                toCol: jumpCol, 
+                                captures: [{row: newRow, col: newCol}] 
                             });
                         }
                     }
                 }
             }
-            
+
             return moves;
         }
 
-        // Resaltar movimientos válidos
-        function highlightValidMoves() {
-            clearHighlights();
-            
-            // Resaltar la ficha seleccionada
-            const selectedCell = document.querySelector(
-                `.cell[data-row="${gameState.selectedPiece.row}"][data-col="${gameState.selectedPiece.col}"]`
-            );
-            selectedCell.classList.add('selected');
-            
-            // Resaltar los movimientos válidos
-            gameState.validMoves.forEach(move => {
-                const cell = document.querySelector(
-                    `.cell[data-row="${move.toRow}"][data-col="${move.toCol}"]`
-                );
-                cell.classList.add('valid-move');
+        function isValidPosition(row, col) {
+            return row >= 0 && row < 8 && col >= 0 && col < 8;
+        }
+
+        function highlightPossibleMoves(moves) {
+            moves.forEach(move => {
+                const cell = document.querySelector(`.cell[data-row="${move.toRow}"][data-col="${move.toCol}"]`);
+                cell.classList.add('possible-move');
             });
         }
 
-        // Limpiar resaltados
         function clearHighlights() {
-            document.querySelectorAll('.cell.selected, .cell.valid-move').forEach(cell => {
-                cell.classList.remove('selected', 'valid-move');
+            document.querySelectorAll('.cell.possible-move').forEach(cell => {
+                cell.classList.remove('possible-move');
             });
         }
 
-        // Mover una ficha
-        function movePiece(fromRow, fromCol, toRow, toCol) {
-            const piece = gameState.board[fromRow][fromCol];
-            gameState.board[fromRow][fromCol] = null;
-            gameState.board[toRow][toCol] = piece;
-            
-            // Actualizar la interfaz
-            const fromCell = document.querySelector(
-                `.cell[data-row="${fromRow}"][data-col="${fromCol}"]`
-            );
-            const toCell = document.querySelector(
-                `.cell[data-row="${toRow}"][data-col="${toCol}"]`
-            );
-            
-            const pieceElement = fromCell.querySelector('.piece');
-            fromCell.removeChild(pieceElement);
-            toCell.appendChild(pieceElement);
-            
-            // Coronar si llega al final del tablero
-            if ((piece.player === 1 && toRow === 7) || (piece.player === 2 && toRow === 0)) {
-                piece.isKing = true;
-                pieceElement.classList.add('king');
+        function makeMove(gameRef, board, fromRow, fromCol, toRow, toCol, captures) {
+            const newBoard = JSON.parse(JSON.stringify(board));
+            const piece = newBoard[fromRow][fromCol];
+
+            // Mover pieza
+            newBoard[toRow][toCol] = piece;
+            newBoard[fromRow][fromCol] = null;
+
+            // Coronar si llega al final
+            if ((piece.color === 'red' && toRow === 7) || (piece.color === 'black' && toRow === 0)) {
+                newBoard[toRow][toCol].type = 'king';
             }
+
+            // Eliminar piezas capturadas
+            captures.forEach(capture => {
+                newBoard[capture.row][capture.col] = null;
+            });
+
+            // Cambiar turno
+            const nextTurn = piece.color === 'red' ? 'black' : 'red';
+
+            gameRef.update({
+                board: newBoard,
+                currentTurn: nextTurn
+            });
+
+            // Verificar fin del juego
+            checkGameEnd(gameRef, newBoard, nextTurn);
         }
 
-        // Eliminar una ficha
-        function removePiece(row, col) {
-            gameState.board[row][col] = null;
-            const cell = document.querySelector(
-                `.cell[data-row="${row}"][data-col="${col}"]`
-            );
-            const piece = cell.querySelector('.piece');
-            if (piece) cell.removeChild(piece);
-        }
-
-        // Verificar si el juego ha terminado
-        function checkGameEnd() {
-            // Verificar si un jugador no tiene fichas
-            let player1Pieces = 0;
-            let player2Pieces = 0;
-            let player1CanMove = false;
-            let player2CanMove = false;
+        function checkGameEnd(gameRef, board, currentTurn) {
+            const pieces = { red: 0, black: 0 };
             
             for (let row = 0; row < 8; row++) {
                 for (let col = 0; col < 8; col++) {
-                    const piece = gameState.board[row][col];
-                    if (piece) {
-                        if (piece.player === 1) {
-                            player1Pieces++;
-                            if (getValidMoves(row, col).length > 0) player1CanMove = true;
-                        } else {
-                            player2Pieces++;
-                            if (getValidMoves(row, col).length > 0) player2CanMove = true;
-                        }
+                    if (board[row][col]) {
+                        pieces[board[row][col].color]++;
                     }
                 }
             }
-            
-            if (player1Pieces === 0 || !player1CanMove) {
-                gameState.gameStatus = 'finished';
-                gameState.winner = 2;
-                endGame();
-            } else if (player2Pieces === 0 || !player2CanMove) {
-                gameState.gameStatus = 'finished';
-                gameState.winner = 1;
-                endGame();
+
+            if (pieces.red === 0 || pieces.black === 0) {
+                gameRef.update({
+                    status: 'finished',
+                    winner: pieces.red === 0 ? 'black' : 'red'
+                });
             }
         }
 
-        // Finalizar el juego y procesar pagos
-        function endGame() {
-            gameStatus.textContent = `¡Jugador ${gameState.winner} ha ganado!`;
-            gameStatus.className = 'status finished';
+        function countPieces(board) {
+            let redCount = 0;
+            let blackCount = 0;
+
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    if (board[row][col]) {
+                        if (board[row][col].color === 'red') redCount++;
+                        else blackCount++;
+                    }
+                }
+            }
+
+            document.getElementById('red-pieces').textContent = redCount;
+            document.getElementById('black-pieces').textContent = blackCount;
+        }
+
+        function resetBoard() {
+            createBoard();
+            document.getElementById('game-status').textContent = 'Esperando jugadores...';
+            document.getElementById('current-turn').textContent = '-';
+            document.getElementById('player-color').textContent = '-';
+        }
+
+        // Chat functions
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
             
-            // Procesar pagos
-            if (gameState.winner && currentUser) {
-                const winnerBet = gameState.players[gameState.winner].bet;
-                const totalPot = gameState.players[1].bet + gameState.players[2].bet;
-                const commission = totalPot * 0.05; // 5% de comisión
-                const winnerPayout = totalPot - commission;
+            if (message && currentGame && currentUser) {
+                const chatRef = database.ref('games/' + currentGame + '/chat');
+                chatRef.push({
+                    sender: currentUser.email,
+                    message: message,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
                 
-                if (gameState.players[gameState.winner].uid === currentUser.uid) {
-                    // El usuario actual ganó
-                    userBalance += winnerPayout;
-                    updateUserBalance();
-                    
-                    // Actualizar en Firebase
-                    db.collection('users').doc(currentUser.uid).update({
-                        balance: userBalance
-                    });
-                }
+                input.value = '';
             }
         }
 
-        // Actualizar la interfaz de usuario del juego
-        function updateGameUI() {
-            // Actualizar información de los jugadores
-            player1Info.classList.toggle('active', gameState.currentPlayer === 1);
-            player2Info.classList.toggle('active', gameState.currentPlayer === 2);
-            
-            player1Bet.textContent = `Apuesta: ${gameState.players[1].bet} CUP`;
-            player2Bet.textContent = `Apuesta: ${gameState.players[2].bet} CUP`;
-            
-            // Actualizar estado del juego
-            if (gameState.gameStatus === 'waiting') {
-                gameStatus.textContent = 'Esperando jugadores...';
-                gameStatus.className = 'status waiting';
-            } else if (gameState.gameStatus === 'playing') {
-                gameStatus.textContent = `Turno del Jugador ${gameState.currentPlayer}`;
-                gameStatus.className = 'status playing';
-            }
+        // Utility functions
+        function generateGameId() {
+            return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
         }
 
-        // Actualizar el saldo del usuario en la interfaz
-        function updateUserBalance() {
-            userBalanceElem.textContent = `${userBalance} CUP`;
-        }
-
-        // Manejar la apuesta
-        function placeBet(amount) {
-            if (!currentUser) return;
-            
-            amount = parseInt(amount);
-            if (amount < 50 || amount > 1000) {
-                alert('La apuesta debe estar entre 50 y 1000 CUP');
-                return;
-            }
-            
-            if (userBalance < amount) {
-                alert('Saldo insuficiente');
-                return;
-            }
-            
-            // Restar la apuesta del saldo
-            userBalance -= amount;
-            updateUserBalance();
-            
-            // Asignar al jugador
-            const playerSlot = gameState.players[1].uid ? 2 : 1;
-            gameState.players[playerSlot] = {
-                uid: currentUser.uid,
-                bet: amount
-            };
-            
-            // Actualizar en Firebase
-            db.collection('users').doc(currentUser.uid).update({
-                balance: userBalance
-            });
-            
-            // Si ambos jugadores han apostado, comenzar el juego
-            if (gameState.players[1].uid && gameState.players[2].uid) {
-                gameState.gameStatus = 'playing';
-                gameState.currentPlayer = 1;
-            }
-            
-            updateGameUI();
-            
-            // Ocultar área de apuestas si ya se apostó
-            if (gameState.players[1].uid === currentUser.uid || gameState.players[2].uid === currentUser.uid) {
-                bettingArea.classList.add('hidden');
-            }
-        }
-
-        // Event Listeners
-        loginBtn.addEventListener('click', () => {
-            const email = document.getElementById('emailInput').value;
-            const password = document.getElementById('passwordInput').value;
-            
-            auth.signInWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    currentUser = userCredential.user;
-                    loadUserData();
-                })
-                .catch((error) => {
-                    alert('Error al iniciar sesión: ' + error.message);
-                });
-        });
-
-        registerBtn.addEventListener('click', () => {
-            const email = document.getElementById('emailInput').value;
-            const password = document.getElementById('passwordInput').value;
-            
-            auth.createUserWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    currentUser = userCredential.user;
-                    
-                    // Crear documento de usuario en Firestore
-                    return db.collection('users').doc(currentUser.uid).set({
-                        email: currentUser.email,
-                        balance: 1000, // Saldo inicial
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                })
-                .then(() => {
-                    loadUserData();
-                })
-                .catch((error) => {
-                    alert('Error al registrarse: ' + error.message);
-                });
-        });
-
-        logoutBtn.addEventListener('click', () => {
-            auth.signOut().then(() => {
-                currentUser = null;
-                userBalance = 0;
-                resetGame();
-                showAuthSection();
-            });
-        });
-
-        placeBetBtn.addEventListener('click', () => {
-            const amount = betAmountInput.value;
-            placeBet(amount);
-        });
-
-        betOptions.forEach(option => {
-            option.addEventListener('click', () => {
-                betOptions.forEach(opt => opt.classList.remove('selected'));
-                option.classList.add('selected');
-                betAmountInput.value = option.dataset.amount;
-            });
-        });
-
-        // Cargar datos del usuario
-        function loadUserData() {
-            db.collection('users').doc(currentUser.uid).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        userBalance = doc.data().balance;
-                        updateUserBalance();
-                        userEmail.textContent = doc.data().email;
-                        showGameSection();
-                    }
-                })
-                .catch((error) => {
-                    console.error('Error al cargar datos del usuario:', error);
-                });
-        }
-
-        // Mostrar sección de autenticación
-        function showAuthSection() {
-            authSection.classList.remove('hidden');
-            userInfo.classList.add('hidden');
-            bettingArea.classList.add('hidden');
-            gameInfo.classList.add('hidden');
-        }
-
-        // Mostrar sección del juego
-        function showGameSection() {
-            authSection.classList.add('hidden');
-            userInfo.classList.remove('hidden');
-            bettingArea.classList.remove('hidden');
-            gameInfo.classList.remove('hidden');
-        }
-
-        // Reiniciar el juego
-        function resetGame() {
-            gameState = {
-                board: [],
-                currentPlayer: 1,
-                selectedPiece: null,
-                validMoves: [],
-                gameStatus: 'waiting',
-                players: {
-                    1: { uid: null, bet: 0 },
-                    2: { uid: null, bet: 0 }
-                },
-                winner: null
-            };
-            
-            initializeBoard();
-            updateGameUI();
-            bettingArea.classList.remove('hidden');
-        }
-
-        // Observador de autenticación
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                currentUser = user;
-                loadUserData();
-            } else {
-                currentUser = null;
-                showAuthSection();
-            }
-        });
-
-        // Inicializar la aplicación
-        initializeBoard();
-        updateGameUI();
+        // Inicializar la aplicación cuando se carga la página
+        window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
